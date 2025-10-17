@@ -43,14 +43,6 @@ export const CalendarHolidayModel = {
     return String(result.insertId);
   },
 
-  async update(id: string, data: Partial<CalendarHoliday>): Promise<void> {
-    const { name, date, recurring } = data;
-    await db.query(
-      `UPDATE jour_ferie SET titre = ?, date = ?, recurent = ? WHERE id_jour_ferie = ?`,
-      [name, date, recurring, id]
-    );
-  },
-
   async delete(id: string): Promise<void> {
     await db.query(`DELETE FROM jour_ferie WHERE id_jour_ferie = ?`, [id]);
   },

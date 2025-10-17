@@ -25,3 +25,30 @@ export const getTemporaryExits = async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: 'Erreur serveur.' });
   }
 };
+
+
+export const getDayStatistics = async (req: Request, res: Response) => {
+  try {
+    const { date } = req.query;
+
+    if (!date) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing "date" parameter in query.',
+      });
+    }
+
+    const stats = await AttendanceService.getDayStatistics(String(date));
+    res.json({
+      success: true,
+      message: 'Daily attendance statistics fetched successfully',
+      data: stats,
+    });
+  } catch (err) {
+    console.error('[Controller] Error fetching day statistics:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching day statistics.',
+    });
+  }
+};

@@ -1,7 +1,111 @@
 import db from '../../config/db';
 
+export interface TemporaryExitInfo {
+  id: string;
+  exitTime: string;
+  returnTime: string;
+  description: string;
+}
+
+export interface PointageRecord {
+  id: string;
+  agentId: string;
+  agentName: string;
+  division: string;
+  checkInAM: string;
+  checkOutAM: string;
+  checkInPM: string;
+  checkOutPM: string;
+  status: 'present' | 'late' | 'early-departure' | 'overtime';
+  totalMissedTime: string;
+  temporaryExits: TemporaryExitInfo[];
+}
+
+export interface DayStatistics {
+  date: string;
+  totalAgents: number;
+  present: number;
+  absent: number;
+  late: number;
+  attendanceRate: number;
+  punctualityRate: number;
+  pointageRecords: PointageRecord[];
+}
+
+
 // --- Détails de présence du jour
 export const AttendanceModel = {
+  async getDayStatistics(date: string): Promise<DayStatistics> {
+    // ✅ 1. Récupérer tous les agents
+    const [agents]: any = await db.query(`
+      SELECT 
+        a.matricule AS agentId,
+        a.nom AS agentName,
+        a.division,
+        p.id_pointage,
+        p.heure_arrive_matin AS check_in_am,
+        p.heure_sortie_matin AS check_out_am,
+        p.heure_arrive_aprem AS check_in_pm,
+        p.heure_sortie_aprem AS check_out_pm
+      FROM agent a
+      LEFT JOIN pointage_journalier p ON a.matricule = p.matricule AND DATE(p.date) = ?
+    `, [date]);
+
+    const totalAgents = agents.length;
+    let present = 0;
+    let absent = 0;
+    let late = 0;
+    const pointageRecords: PointageRecord[] = [];
+
+    for (const a of agents) {
+      const isPresent = !!a.id_pointage;
+      const status = isPresent ? 'present' : 'absent';
+      if (status === 'present') present++;
+      else absent++;
+
+      // Exemple simple: si check_in_am > 08:05 => late
+      if (a.check_in_am && a.check_in_am > '08:05:00') late++;
+
+      const [exits]: any = await db.query(`
+        SELECT 
+          id_absence_temporaire AS id,
+          heure_sortie_temporaire AS exitTime,
+          heure_retour_temporaire AS returnTime,
+          description
+        FROM absence_temporaire
+        WHERE id_pointage = ?
+      `, [a.id_pointage]);
+
+      pointageRecords.push({
+        id: a.id_pointage || '',
+        agentId: a.agentId,
+        agentName: a.agentName,
+        division: a.division,
+        checkInAM: a.check_in_am || '',
+        checkOutAM: a.check_out_am || '',
+        checkInPM: a.check_in_pm || '',
+        checkOutPM: a.check_out_pm || '',
+        status: status as any,
+        totalMissedTime: '0h 00m',
+        temporaryExits: exits || [],
+      });
+    }
+
+    const attendanceRate = totalAgents > 0 ? (present / totalAgents) * 100 : 0;
+    const punctualityRate = present > 0 ? ((present - late) / present) * 100 : 0;
+
+    return {
+      date,
+      totalAgents,
+      present,
+      absent,
+      late,
+      attendanceRate: Number(attendanceRate.toFixed(2)),
+      punctualityRate: Number(punctualityRate.toFixed(2)),
+      pointageRecords,
+    };
+  },
+
   async getDailyAttendance(matricule: string, date: string) {
     console.log(`🟢 [Model] Requête pointage pour ${matricule} le ${date}`);
 

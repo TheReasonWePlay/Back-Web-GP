@@ -8,9 +8,7 @@ const router = express.Router();
 router.get('/', verifyToken, CalendarHolidayController.getAll);
 router.get('/:id', verifyToken, CalendarHolidayController.getById);
 
-// 🔧 Seuls les Admins peuvent modifier
 router.post('/', verifyToken, authorizeRoles('Admin'), CalendarHolidayController.create);
-router.put('/:id', verifyToken, authorizeRoles('Admin'), CalendarHolidayController.update);
 router.delete('/:id', verifyToken, authorizeRoles('Admin'), CalendarHolidayController.delete);
 
 export default router;

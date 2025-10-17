@@ -60,24 +60,6 @@ export const CalendarHolidayController = {
     }
   },
 
-  async update(req: Request, res: Response) {
-    try {
-      const { id } = req.params;
-      const updated = await CalendarHolidayService.update(id, req.body);
-      res.json({
-        success: true,
-        message: 'Holiday updated successfully',
-        data: updated,
-      });
-    } catch (error: any) {
-      console.error('[Controller] Error updating holiday:', error);
-      res.status(500).json({
-        success: false,
-        message: error.message || 'Failed to update holiday',
-      });
-    }
-  },
-
   async delete(req: Request, res: Response) {
     try {
       const { id } = req.params;

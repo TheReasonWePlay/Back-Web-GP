@@ -22,6 +22,7 @@ app.use('/api/agents', longAbsenceRoutes);
 app.use('/api/schedules', workScheduleRoutes);
 app.use('/api/holidays', calendarHolidayRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/attendance', agentAttendanceRoutes);
 
 // health check
 app.get('/api/health', (req, res) => res.json({ success: true, message: 'OK' }));

@@ -14,11 +14,6 @@ export const CalendarHolidayService = {
     return await CalendarHolidayModel.findById(insertId);
   },
 
-  async update(id: string, data: Partial<CalendarHoliday>): Promise<CalendarHoliday | null> {
-    await CalendarHolidayModel.update(id, data);
-    return await CalendarHolidayModel.findById(id);
-  },
-
   async delete(id: string): Promise<{ success: boolean }> {
     await CalendarHolidayModel.delete(id);
     return { success: true };
