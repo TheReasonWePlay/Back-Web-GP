@@ -136,8 +136,9 @@ export const AttendanceModel = {
     }
 
     const record = rows[0];
-    record.workHours = record.workHours ? parseFloat(record.workHours.toFixed(2)) : 0;
-
+    record.workHours = record.workHours
+    ? parseFloat(Number(record.workHours).toFixed(2))
+    : 0;
     return record;
   },
 
