@@ -10,6 +10,7 @@ import workScheduleRoutes from './modules/workSchedule/workSchedule.routes';
 import calendarHolidayRoutes from './modules/calendarHoliday/calendarHoliday.routes';
 import userRoutes from './modules/user/user.routes';
 import dashboardStatRoutes from './modules/dashboardStat/dashboardStat.routes';
+import mobileRoutes from './modules/mobile/mobile.routes';
 dotenv.config();
 
 const app = express();
@@ -25,6 +26,8 @@ app.use('/api/holidays', calendarHolidayRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/attendance', agentAttendanceRoutes);
 app.use('/api/dashboard', dashboardStatRoutes);
+app.use('/api/mobile', mobileRoutes);
+
 
 // health check
 app.get('/api/health', (req, res) => res.json({ success: true, message: 'OK' }));
