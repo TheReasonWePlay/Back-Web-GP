@@ -120,7 +120,15 @@ export const MobileInfoModel = {
 // --- Pointage (sortie/rentrée)
 export const MobilePointageModel = {
   async addPointage(id_agent: string, type: string) {
-    const heure = new Date().toLocaleTimeString('fr-FR', { hour12: false });
+    const now = new Date();
+
+    const hours = now.getHours().toString().padStart(2, '0');
+    const minutes = now.getMinutes().toString().padStart(2, '0');
+    const seconds = now.getSeconds().toString().padStart(2, '0');
+
+    const currentTime = `${hours}:${minutes}:${seconds}`;
+
+
     const [existing]: any = await db.query(
       `SELECT id_pointage FROM pointage_journalier WHERE matricule = ? AND DATE(date) = CURDATE()`,
       [id_agent]
@@ -138,35 +146,40 @@ export const MobilePointageModel = {
     );
 
     if (existing.length === 0) {
-      const now = new Date();
-      const hour = now.getHours();
+      const hour1 = now.getHours();
 
-      const champ = (hour < 12)? 'heure_arrive_matin' : 'heure_arrive_aprem';
+      const champ = (hour1 < 12)? 'heure_arrive_matin' : 'heure_arrive_aprem';
 
       await db.query(
         `INSERT INTO pointage_journalier (date, ${champ}, matricule, id_horaire)
          VALUES (CURDATE(), NOW(), ?, ?)`,
         [id_agent, activeShedule[0].id_horaire]
       );
+
+      return { success: true, message: `Check in at ${currentTime}` };
     } else {
       if(type === 'Morning'){
         const champ = existingAM[0].heure_arrive_matin? 'heure_sortie_matin' : 'heure_arrive_matin';
+        const type_text = existingAM[0].heure_arrive_matin? 'Check out' : 'Check in';
         await db.query(
           `UPDATE pointage_journalier SET ${champ} = NOW() WHERE matricule = ? AND DATE(date) = CURDATE()`,
           [id_agent]
         );
+        return { success: true, message: `${type_text} at ${currentTime}` };
       }
       else{
         const champ = existingPM[0].heure_arrive_aprem? 'heure_sortie_aprem' : 'heure_arrive_aprem';
+        const type_text = existingPM[0].heure_arrive_aprem? 'Check out' : 'Check in';
         await db.query(
           `UPDATE pointage_journalier SET ${champ} = NOW() WHERE matricule = ? AND DATE(date) = CURDATE()`,
           [id_agent]
         );
+        return { success: true, message: `${type_text} at ${currentTime}` };
       }
       
     }
 
-    return { success: true, message: `Pointage ${type} enregistré à ${heure}` };
+    
   },
 
   async addLeaving(id_agent: string, type: string, description? : string, id_pointage? : string) {
@@ -189,7 +202,16 @@ export const MobilePointageModel = {
           [description,idPoint]
         );
       }
-      return { success: true, message: `Sortie ${type} enregistré`};
+
+      const now = new Date();
+
+      const hours = now.getHours().toString().padStart(2, '0');
+      const minutes = now.getMinutes().toString().padStart(2, '0');
+      const seconds = now.getSeconds().toString().padStart(2, '0');
+
+      const currentTime = `${hours}:${minutes}:${seconds}`;
+
+      return { success: true, message: `${type} at ${currentTime}`};
     }
     else{
 
