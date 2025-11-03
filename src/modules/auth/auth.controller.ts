@@ -18,3 +18,21 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     next(err);
   }
 };
+
+export const refreshToken = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { refresh_token } = req.body;
+    if (!refresh_token) {
+      return res.status(400).json({ success: false, error: 'Refresh token is required' });
+    }
+
+    const tokens = await AuthService.refreshToken(refresh_token);
+    if (!tokens) {
+      return res.status(401).json({ success: false, error: 'Invalid refresh token' });
+    }
+
+    return res.json({ success: true, data: tokens });
+  } catch (err) {
+    next(err);
+  }
+};

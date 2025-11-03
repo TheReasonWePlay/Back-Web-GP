@@ -8,5 +8,6 @@ const router = Router();
  * Body: { username, password } where username can be nom_utilisateur or email
  */
 router.post('/login', AuthController.login);
+router.post('/refresh', AuthController.refreshToken);
 
 export default router;

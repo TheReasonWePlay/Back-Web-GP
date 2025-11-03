@@ -1,6 +1,6 @@
 import bcrypt from 'bcrypt';
 import * as Model from './auth.model';
-import { signAccessToken, signRefreshToken } from '../../utils/jwt';
+import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../../utils/jwt';
 
 export const login = async (usernameOrEmail: string, password: string) => {
   const user = await Model.findByUsernameOrEmail(usernameOrEmail);
@@ -27,3 +27,32 @@ export const login = async (usernameOrEmail: string, password: string) => {
     refreshToken
   };
 };
+
+export const refreshToken = async (token: string) => {
+  try {
+    const payload = verifyRefreshToken(token) as any;
+    if (!payload) return null;
+
+    // Optionnel : vérifier en base que le refresh token est valide (non révoqué)
+
+    const newAccessToken = signAccessToken({
+      userId: payload.userId,
+      role: payload.role,
+      matricule: payload.matricule,
+    });
+
+    const newRefreshToken = signRefreshToken({
+      userId: payload.userId,
+      role: payload.role,
+      matricule: payload.matricule,
+    });
+
+    return {
+      accessToken: newAccessToken,
+      refreshToken: newRefreshToken,
+    };
+  } catch (err) {
+    return null;
+  }
+};
+

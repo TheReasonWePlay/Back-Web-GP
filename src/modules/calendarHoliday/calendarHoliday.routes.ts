@@ -8,7 +8,7 @@ const router = express.Router();
 router.get('/', verifyToken, CalendarHolidayController.getAll);
 router.get('/:id', verifyToken, CalendarHolidayController.getById);
 
-router.post('/', verifyToken, authorizeRoles('Admin'), CalendarHolidayController.create);
-router.delete('/:id', verifyToken, authorizeRoles('Admin'), CalendarHolidayController.delete);
+router.post('/', verifyToken, CalendarHolidayController.create);
+router.delete('/:id', verifyToken, CalendarHolidayController.delete);
 
 export default router;

@@ -1,4 +1,5 @@
 import express from 'express';
+import { verifyToken } from '../../middlewares/auth.middleware';
 import { 
   getAllAbsences, 
   createAbsence, 
@@ -8,9 +9,9 @@ import {
 
 const router = express.Router();
 
-router.get('/:matricule/absences', getAllAbsences);
-router.post('/:matricule/absences', createAbsence);
-router.put('/:matricule/absences/:absenceId', updateAbsence);
-router.delete('/:matricule/absences/:absenceId', deleteAbsence);
+router.get('/:matricule/absences', verifyToken, getAllAbsences);
+router.post('/:matricule/absences', verifyToken, createAbsence);
+router.put('/:matricule/absences/:absenceId', verifyToken, updateAbsence);
+router.delete('/:matricule/absences/:absenceId', verifyToken, deleteAbsence);
 
 export default router;

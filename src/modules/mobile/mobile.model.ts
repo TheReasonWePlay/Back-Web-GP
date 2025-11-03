@@ -28,7 +28,7 @@ export const MobileDashboardModel = {
 
     (pointages as any[]).forEach(pj => {
       // Présent si heure d'arrivée matin existante
-      if (pj.heure_arrive_matin) present++;
+      if (pj.heure_arrive_matin || pj.heure_arrive_aprem) present++;
 
       // Retard si arrivée après entrée + tolérance
       if (pj.heure_arrive_matin) {
