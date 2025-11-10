@@ -22,6 +22,7 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
 export const refreshToken = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { refresh_token } = req.body;
+    console.log(refresh_token);
     if (!refresh_token) {
       return res.status(400).json({ success: false, error: 'Refresh token is required' });
     }
@@ -31,6 +32,7 @@ export const refreshToken = async (req: Request, res: Response, next: NextFuncti
       return res.status(401).json({ success: false, error: 'Invalid refresh token' });
     }
 
+    console.log(tokens);
     return res.json({ success: true, data: tokens });
   } catch (err) {
     next(err);

@@ -13,5 +13,7 @@ router.get('/:id', verifyToken, UserController.getById);
 router.post('/', verifyToken, authorizeRoles('Admin'), UserController.create);
 router.put('/:id', verifyToken, authorizeRoles('Admin'), UserController.update);
 router.delete('/:id', verifyToken, authorizeRoles('Admin'), UserController.delete);
+router.post('/:id/update-password', verifyToken, UserController.updatePdw);
+router.post('/:id/reset-password', verifyToken, authorizeRoles('Admin'), UserController.resetPdw);
 
 export default router;

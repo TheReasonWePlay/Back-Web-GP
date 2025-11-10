@@ -5,7 +5,7 @@ dotenv.config();
 const JWT_SECRET: Secret = process.env.JWT_SECRET || 'secret';
 const JWT_REFRESH_SECRET: Secret = process.env.JWT_REFRESH_SECRET || 'refresh_secret';
 
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '15m';
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '5m';
 const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
 
 export const signAccessToken = (payload: object) => {

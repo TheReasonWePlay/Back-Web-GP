@@ -61,6 +61,42 @@ export const UserController = {
     }
   },
 
+  async updatePdw(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const updated = await UserService.updatePwd(id, req.body);
+      res.json({
+        success: true,
+        message: 'Password updated successfully',
+        data: updated,
+      });
+    } catch (error: any) {
+      console.error('[Controller] Error updating password:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Failed to update password',
+      });
+    }
+  },
+
+  async resetPdw(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const updated = await UserService.resetPwd(id);
+      res.json({
+        success: true,
+        message: 'Password reset successfully',
+        data: updated,
+      });
+    } catch (error: any) {
+      console.error('[Controller] Error reset password:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Failed to reset password',
+      });
+    }
+  },
+
   async update(req: Request, res: Response) {
     try {
       const { id } = req.params;

@@ -12,21 +12,33 @@ export interface WorkSchedule {
 }
 
 export const WorkScheduleModel = {
-  async findAll(): Promise<WorkSchedule[]> {
+  async findAll(): Promise<(WorkSchedule & { deletable: boolean })[]> {
     const [rows]: any = await db.query(`
       SELECT 
-        id_horaire AS id,
-        intitule AS name,
-        entree_matin AS morningStart,
-        sortie_matin AS morningEnd,
-        entree_aprem AS afternoonStart,
-        sortie_aprem AS afternoonEnd,
-        tolerance_retard AS tolerance,
-        actif AS isActive
-      FROM horaire_travail
+        h.id_horaire AS id,
+        h.intitule AS name,
+        h.entree_matin AS morningStart,
+        h.sortie_matin AS morningEnd,
+        h.entree_aprem AS afternoonStart,
+        h.sortie_aprem AS afternoonEnd,
+        h.tolerance_retard AS tolerance,
+        h.actif AS isActive,
+        CASE WHEN COUNT(p.id_horaire) = 0 THEN TRUE ELSE FALSE END AS deletable
+      FROM horaire_travail h
+      LEFT JOIN pointage_journalier p ON p.id_horaire = h.id_horaire
+      GROUP BY 
+        h.id_horaire,
+        h.intitule,
+        h.entree_matin,
+        h.sortie_matin,
+        h.entree_aprem,
+        h.sortie_aprem,
+        h.tolerance_retard,
+        h.actif
     `);
+  
     return rows;
-  },
+  },  
 
   async findActive(): Promise<WorkSchedule | null> {
     const [rows]: any = await db.query(`
