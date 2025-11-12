@@ -146,6 +146,7 @@ export const MobilePointageModel = {
     );
 
     if (existing.length === 0) {
+
       const hour1 = now.getHours();
 
       const champ = (hour1 < 12)? 'heure_arrive_matin' : 'heure_arrive_aprem';
@@ -158,23 +159,32 @@ export const MobilePointageModel = {
 
       return { success: true, message: `Check in at ${currentTime}` };
     } else {
-      if(type === 'Morning'){
-        const champ = existingAM[0].heure_arrive_matin? 'heure_sortie_matin' : 'heure_arrive_matin';
-        const type_text = existingAM[0].heure_arrive_matin? 'Check out' : 'Check in';
-        await db.query(
-          `UPDATE pointage_journalier SET ${champ} = NOW() WHERE matricule = ? AND DATE(date) = CURDATE()`,
-          [id_agent]
-        );
-        return { success: true, message: `${type_text} at ${currentTime}` };
+      const [existingLeavWithoutReturn]: any = await db.query(
+        `SELECT heure_retour_temporaire FROM absence_temporaire WHERE id_pointage = ? ORDER BY id_absence_temporaire DESC LIMIT 1`,
+        [existing[0].id_pointage]
+      );
+      if(existingLeavWithoutReturn[0].heure_retour_temporaire == null){
+        return { success: false, message: "pointage impossible, l'agents n'est pas encore retounrné de sa sortie" };
       }
       else{
-        const champ = existingPM[0].heure_arrive_aprem? 'heure_sortie_aprem' : 'heure_arrive_aprem';
-        const type_text = existingPM[0].heure_arrive_aprem? 'Check out' : 'Check in';
-        await db.query(
-          `UPDATE pointage_journalier SET ${champ} = NOW() WHERE matricule = ? AND DATE(date) = CURDATE()`,
-          [id_agent]
-        );
-        return { success: true, message: `${type_text} at ${currentTime}` };
+        if(type === 'Morning'){
+          const champ = existingAM[0].heure_arrive_matin? 'heure_sortie_matin' : 'heure_arrive_matin';
+          const type_text = existingAM[0].heure_arrive_matin? 'Check out' : 'Check in';
+          await db.query(
+            `UPDATE pointage_journalier SET ${champ} = NOW() WHERE matricule = ? AND DATE(date) = CURDATE()`,
+            [id_agent]
+          );
+          return { success: true, message: `${type_text} at ${currentTime}` };
+        }
+        else{
+          const champ = existingPM[0].heure_arrive_aprem? 'heure_sortie_aprem' : 'heure_arrive_aprem';
+          const type_text = existingPM[0].heure_arrive_aprem? 'Check out' : 'Check in';
+          await db.query(
+            `UPDATE pointage_journalier SET ${champ} = NOW() WHERE matricule = ? AND DATE(date) = CURDATE()`,
+            [id_agent]
+          );
+          return { success: true, message: `${type_text} at ${currentTime}` };
+        }
       }
       
     }
