@@ -12,8 +12,9 @@ export const AgentModel = {
   findAll: async (): Promise<Agent[]> => {
     // 1️⃣ Récupère tous les agents
     const [rows]: any = await db.query(`
-      SELECT a.matricule, a.nom, a.division, a.poste
-      FROM agent a
+    SELECT a.matricule, a.nom, a.division, a.poste
+    FROM agent a
+    ORDER BY a.division ASC, a.nom ASC;
     `);
   
     const today = new Date().toISOString().split("T")[0]; // ex. "2025-10-11"
@@ -78,7 +79,7 @@ export const AgentModel = {
   
 
   findById: async (matricule: string): Promise<any | null> => {
-    console.log('🟢 [Model] Requête pour matricule:', matricule);
+    //console.log('🟢 [Model] Requête pour matricule:', matricule);
   
     // --- 1️⃣ Récupérer l'agent de base
     const [agentRows]: any = await db.query(
@@ -86,10 +87,10 @@ export const AgentModel = {
       [matricule]
     );
   
-    console.log('🟢 [Model] Résultat agentRows:', agentRows);
+    //console.log('🟢 [Model] Résultat agentRows:', agentRows);
   
     if (!agentRows.length) {
-      console.log('🔴 Aucun agent trouvé dans la base');
+      //console.log('🔴 Aucun agent trouvé dans la base');
       return null;
     }
   

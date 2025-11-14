@@ -37,27 +37,53 @@ export const DashboardStatModel = {
     const [total]: any = await db.query(`SELECT COUNT(*) AS total FROM agent`);
     const totalAgents = total[0].total || 0;
 
-    // Présents aujourd'hui
-    const [present]: any = await db.query(`
-      SELECT COUNT(*) AS present 
-      FROM pointage_journalier 
-      WHERE DATE(date) = CURDATE()
+    const now = new Date();
+    const hour1 = now.getHours();
+
+    // Récupération de la date du jour
+    const [pointages]: any = await db.query(`
+      SELECT pj.*, h.tolerance_retard, h.entree_matin, h.entree_aprem
+      FROM pointage_journalier pj
+      JOIN horaire_travail h ON pj.id_horaire = h.id_horaire
+      WHERE DATE(pj.date) = CURDATE()
     `);
 
-    // En retard
-    const [late]: any = await db.query(`
-      SELECT COUNT(*) AS late 
-      FROM pointage_journalier 
-      WHERE DATE(date) = CURDATE() AND heure_arrive_matin > '08:15:00'
-    `);
+    let present = 0;
+    let late = 0;
 
-    // En congé aujourd'hui
-    const [onLeave]: any = await db.query(`
-      SELECT COUNT(DISTINCT a.matricule) AS onLeave
-      FROM absence_longue al
-      JOIN agent a ON a.matricule = al.matricule
-      WHERE CURDATE() BETWEEN al.date_debut AND al.date_fin
-    `);
+    (pointages as any[]).forEach(pj => {
+      // Présent si heure d'arrivée matin existante
+      if(hour1 < 12){
+        if (pj.heure_arrive_matin || pj.heure_arrive_aprem) present++;
+
+        // Retard si arrivée après entrée + tolérance
+        if (pj.heure_arrive_matin) {
+          const scheduled = pj.entree_matin; // ex: "08:00:00"
+          const tolerance = pj.tolerance_retard; // minutes
+          const arrive = pj.heure_arrive_matin;
+  
+          const scheduledMinutes = Number(scheduled.split(':')[0]) * 60 + Number(scheduled.split(':')[1]);
+          const arriveMinutes = Number(arrive.split(':')[0]) * 60 + Number(arrive.split(':')[1]);
+  
+          if (arriveMinutes > scheduledMinutes + tolerance) late++;
+        }
+      }
+      else{
+        if (pj.heure_arrive_aprem) present++;
+
+        if (pj.heure_arrive_aprem) {
+          const scheduled = pj.entree_aprem; // ex: "08:00:00"
+          const tolerance = pj.tolerance_retard; // minutes
+          const arrive = pj.heure_arrive_aprem;
+  
+          const scheduledMinutes = Number(scheduled.split(':')[0]) * 60 + Number(scheduled.split(':')[1]);
+          const arriveMinutes = Number(arrive.split(':')[0]) * 60 + Number(arrive.split(':')[1]);
+  
+          if (arriveMinutes > scheduledMinutes + tolerance) late++;
+        }
+      }
+     
+    });
 
     // Moyenne d'heures travaillées aujourd'hui
     const [avgWorkHours]: any = await db.query(`
@@ -65,13 +91,12 @@ export const DashboardStatModel = {
         TIME_TO_SEC(TIMEDIFF(heure_sortie_aprem, heure_arrive_matin)) / 3600
       ) AS avgHours
       FROM pointage_journalier
-      WHERE DATE(date) = CURDATE()
     `);
 
-    const presentToday = present[0].present || 0;
-    const lateArrivals = late[0].late || 0;
-    const onLeaveToday = onLeave[0].onLeave || 0;
-    const absentToday = Math.max(totalAgents - presentToday - onLeaveToday, 0);
+    const presentToday = present || 0;
+    const lateArrivals = late || 0;
+    const onLeaveToday = 0;
+    const absentToday = Math.max(totalAgents - presentToday, 0);
     const attendanceRate = totalAgents ? (presentToday / totalAgents) * 100 : 0;
 
     return {
@@ -147,7 +172,7 @@ export const DashboardStatModel = {
     const [monthly]: any = await db.query(`
       SELECT 
         DATE_FORMAT(date, '%Y-%m') AS month,
-        COUNT(*) AS present
+        COUNT(*) AS "Taux de présence"
       FROM pointage_journalier
       GROUP BY DATE_FORMAT(date, '%Y-%m')
       ORDER BY month DESC

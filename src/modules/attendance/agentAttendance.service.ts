@@ -15,6 +15,8 @@ export const AttendanceService = {
   },
 
   async getDayStatistics(date: string): Promise<DayStatistics> {
-    return await AttendanceModel.getDayStatistics(date);
+    const data = await AttendanceModel.getDayStatistics(date);
+    console.log(data);
+    return data;
   },
 };

@@ -1,3 +1,4 @@
+import { Query } from 'mysql2/typings/mysql/lib/protocol/sequences/Query';
 import db from '../../config/db';
 
 export interface TemporaryExitInfo {
@@ -16,7 +17,7 @@ export interface PointageRecord {
   checkOutAM: string;
   checkInPM: string;
   checkOutPM: string;
-  status: 'present' | 'late' | 'early-departure' | 'overtime';
+  status: string;
   totalMissedTime: string;
   temporaryExits: TemporaryExitInfo[];
 }
@@ -36,63 +37,144 @@ export interface DayStatistics {
 // --- Détails de présence du jour
 export const AttendanceModel = {
   async getDayStatistics(date: string): Promise<DayStatistics> {
-    // ✅ 1. Récupérer tous les agents
-    const [agents]: any = await db.query(`
-      SELECT 
-        a.matricule AS agentId,
-        a.nom AS agentName,
-        a.division,
-        p.id_pointage,
-        p.heure_arrive_matin AS check_in_am,
-        p.heure_sortie_matin AS check_out_am,
-        p.heure_arrive_aprem AS check_in_pm,
-        p.heure_sortie_aprem AS check_out_pm
-      FROM agent a
-      LEFT JOIN pointage_journalier p ON a.matricule = p.matricule AND DATE(p.date) = ?
-    `, [date]);
-
-    const totalAgents = agents.length;
-    let present = 0;
-    let absent = 0;
-    let late = 0;
-    const pointageRecords: PointageRecord[] = [];
-
-    for (const a of agents) {
-      const isPresent = !!a.id_pointage;
-      const status = isPresent ? 'present' : 'absent';
-      if (status === 'present') present++;
-      else absent++;
-
-      // Exemple simple: si check_in_am > 08:05 => late
-      if (a.check_in_am && a.check_in_am > '08:05:00') late++;
-
-      const [exits]: any = await db.query(`
+    //
+    // 1️⃣ Charger tous les agents + leurs pointages + horaire
+    //
+    const [agents]: any = await db.query(
+      `
         SELECT 
+          a.matricule AS agentId,
+          a.nom AS agentName,
+          a.division,
+  
+          p.id_pointage,
+          p.heure_arrive_matin AS checkInAM,
+          p.heure_sortie_matin AS checkOutAM,
+          p.heure_arrive_aprem AS checkInPM,
+          p.heure_sortie_aprem AS checkOutPM,
+  
+          h.entree_matin AS expectedAM,
+          h.tolerance_retard AS lateTolerance
+        FROM agent a
+        LEFT JOIN pointage_journalier p 
+            ON a.matricule = p.matricule AND DATE(p.date) = ?
+        LEFT JOIN horaire_travail h 
+            ON p.id_horaire = h.id_horaire
+      `,
+      [date]
+    );
+  
+    //
+    // 2️⃣ Précharger toutes les sorties temporaires pour la journée
+    //
+    const [allExits]: any = await db.query(
+      `
+        SELECT 
+          at.id_pointage,
           id_absence_temporaire AS id,
           heure_sortie_temporaire AS exitTime,
           heure_retour_temporaire AS returnTime,
           description
-        FROM absence_temporaire
-        WHERE id_pointage = ?
-      `, [a.id_pointage]);
-
+        FROM absence_temporaire at
+        JOIN pointage_journalier pj ON pj.id_pointage = at.id_pointage
+        WHERE DATE(pj.date) = ?
+      `,
+      [date]
+    );
+  
+    // Réorganisation par id_pointage
+    const exitsByPointage: Record<string, any[]> = {};
+    for (const e of allExits) {
+      if (!exitsByPointage[e.id_pointage]) exitsByPointage[e.id_pointage] = [];
+      exitsByPointage[e.id_pointage].push(e);
+    }
+  
+    //
+    // 3️⃣ Statistiques globales
+    //
+    const totalAgents = agents.length;
+    let present = 0;
+    let absent = 0;
+    let late = 0;
+  
+    const pointageRecords: PointageRecord[] = [];
+  
+    //
+    // 4️⃣ Utilitaire interne
+    //
+    const timeToSec = (t: string | null) => {
+      if (!t) return 0;
+      const [h, m, s] = t.split(":").map(Number);
+      return h * 3600 + m * 60 + s;
+    };
+  
+    const formatHM = (sec: number) => {
+      if (sec <= 0) return "0h 00m";
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      return `${h}h ${m}m`;
+    };
+  
+    //
+    // 5️⃣ Analyse agent par agent
+    //
+    for (const a of agents) {
+      const isPresent = !!a.id_pointage;
+  
+      if (isPresent) present++;
+      else absent++;
+  
+      // Vérification retard
+      let isLate = false;
+      if (a.checkInAM && a.expectedAM) {
+        const tolerance = a.lateTolerance ? Number(a.lateTolerance) : 0;
+        const expected = timeToSec(a.expectedAM) + tolerance * 60;
+        const actual = timeToSec(a.checkInAM);
+  
+        if (actual > expected) {
+          late++;
+          isLate = true;
+        }
+      }
+  
+      // Calcul des heures travaillées
+      const morning =
+        Math.max(0, timeToSec(a.checkOutAM) - timeToSec(a.checkInAM));
+  
+      const afternoon =
+        Math.max(0, timeToSec(a.checkOutPM) - timeToSec(a.checkInPM));
+  
+      const totalSeconds = morning + afternoon;
+  
+      const agentExits = exitsByPointage[a.id_pointage] || [];
+  
       pointageRecords.push({
-        id: a.id_pointage || '',
+        id: a.id_pointage || "",
         agentId: a.agentId,
         agentName: a.agentName,
         division: a.division,
-        checkInAM: a.check_in_am || '',
-        checkOutAM: a.check_out_am || '',
-        checkInPM: a.check_in_pm || '',
-        checkOutPM: a.check_out_pm || '',
-        status: status as any,
-        totalMissedTime: '0h 00m',
-        temporaryExits: exits || [],
+        checkInAM: a.checkInAM || "",
+        checkOutAM: a.checkOutAM || "",
+        checkInPM: a.checkInPM || "",
+        checkOutPM: a.checkOutPM || "",
+        status: isPresent ? (isLate ? "late" : "present") : "absent",
+        totalMissedTime: formatHM(totalSeconds),
+        temporaryExits: agentExits,
       });
     }
-
-    const attendanceRate = totalAgents > 0 ? (present / totalAgents) * 100 : 0;
-    const punctualityRate = present > 0 ? ((present - late) / present) * 100 : 0;
+  
+    //
+    // 6️⃣ Finaliser les ratios
+    //
+    const attendanceRate =
+      totalAgents > 0 ? (present / totalAgents) * 100 : 0;
+  
+    const punctualityRate =
+      present > 0 ? ((present - late) / present) * 100 : 0;
+  
+    //
+    // 7️⃣ Retour final propre
+    //
 
     return {
       date,
@@ -104,48 +186,100 @@ export const AttendanceModel = {
       punctualityRate: Number(punctualityRate.toFixed(2)),
       pointageRecords,
     };
-  },
+  },  
 
   async getDailyAttendance(matricule: string, date: string) {
     console.log(`🟢 [Model] Requête pointage pour ${matricule} le ${date}`);
-
+  
     const [rows]: any = await db.query(
       `SELECT 
-          id_pointage AS attendanceId,
-          matricule,
-          DATE(date) AS date,
-          heure_arrive_matin AS morningCheckIn,
-          heure_sortie_matin AS morningCheckOut,
-          heure_arrive_aprem AS afternoonCheckIn,
-          heure_sortie_aprem AS afternoonCheckOut,
-          TIME_TO_SEC(TIMEDIFF(heure_sortie_aprem, heure_arrive_matin)) / 3600 AS workHours,
+          a.id_pointage AS attendanceId,
+          a.matricule,
+          DATE(a.date) AS date,
+          a.heure_arrive_matin AS morningCheckIn,
+          a.heure_sortie_matin AS morningCheckOut,
+          a.heure_arrive_aprem AS afternoonCheckIn,
+          a.heure_sortie_aprem AS afternoonCheckOut,
+          TIME_TO_SEC(TIMEDIFF(a.heure_sortie_matin, a.heure_arrive_matin)
+                      + TIMEDIFF(a.heure_sortie_aprem, a.heure_arrive_aprem)) AS workSeconds,
           CASE
-            WHEN heure_arrive_matin IS NULL AND heure_sortie_aprem IS NULL THEN 'Absent'
-            WHEN heure_arrive_matin > '08:15:00' THEN 'Late'
-            WHEN (heure_arrive_matin IS NOT NULL AND (heure_sortie_aprem IS NULL OR heure_arrive_aprem IS NULL)) THEN 'Half-day'
+            WHEN a.heure_arrive_matin IS NULL AND a.heure_sortie_aprem IS NULL THEN 'Absent'
+            WHEN a.heure_arrive_matin > '08:15:00' THEN 'Late'
+            WHEN (a.heure_arrive_matin IS NOT NULL AND 
+                  (a.heure_sortie_aprem IS NULL OR a.heure_arrive_aprem IS NULL)) THEN 'Half-day'
             ELSE 'Present'
-          END AS status
-        FROM pointage_journalier
+          END AS status,
+          h.entree_matin,
+          h.sortie_matin,
+          h.entree_aprem,
+          h.sortie_aprem,
+          h.tolerance_retard AS tolerance
+        FROM pointage_journalier AS a 
+        JOIN horaire_travail AS h ON a.id_horaire = h.id_horaire
         WHERE matricule = ? AND DATE(date) = ?`,
       [matricule, date]
     );
-
+  
     if (!rows.length) {
-      console.log('🔴 Aucun pointage trouvé');
+      console.log("🔴 Aucun pointage trouvé");
       return null;
     }
-
-    const record = rows[0];
-    record.workHours = record.workHours
-    ? parseFloat(Number(record.workHours).toFixed(2))
-    : 0;
-    return record;
+  
+    const r = rows[0];
+  
+    // 🔍 Vérification congé séparée
+    const [longAbs]: any = await db.query(
+      `SELECT 
+        type AS type_abs,
+         CASE 
+           WHEN DATE(?) BETWEEN date_debut AND date_fin THEN TRUE 
+           ELSE FALSE
+         END AS conge
+       FROM absence_longue 
+       WHERE matricule = ?
+       LIMIT 1`,
+      [date, matricule]
+    );
+  
+    // Si aucune ligne trouvée → par défaut false
+    r.conge = longAbs.length ? !!longAbs[0].conge : false;
+    r.type_abs = longAbs[0].type_abs;
+  
+    // Convertit HH:MM:SS → secondes
+    const timeToSeconds = (t: string | null): number => {
+      if (!t) return 0;
+      const [h, m, s] = t.split(":").map(Number);
+      return h * 3600 + m * 60 + s;
+    };
+  
+    let totalSeconds = r.workSeconds;
+  
+    if (totalSeconds === null) {
+      const morningStart = timeToSeconds(r.morningCheckIn);
+      const morningEnd = timeToSeconds(r.morningCheckOut);
+      const afternoonStart = timeToSeconds(r.afternoonCheckIn);
+      const afternoonEnd = timeToSeconds(r.afternoonCheckOut);
+  
+      const morning = morningEnd > morningStart ? morningEnd - morningStart : 0;
+      const afternoon = afternoonEnd > afternoonStart ? afternoonEnd - afternoonStart : 0;
+  
+      totalSeconds = morning + afternoon;
+    }
+  
+    if (totalSeconds < 0 || isNaN(totalSeconds)) totalSeconds = 0;
+  
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+  
+    r.workHours = `${hours}h ${minutes}m`;
+  
+    return r;
   },
 
   // --- Sorties temporaires du jour
   async getTemporaryExits(matricule: string, date: string) {
     console.log(`🟢 [Model] Requête sorties temporaires pour ${matricule} le ${date}`);
-
+  
     const [rows]: any = await db.query(
       `SELECT 
           at.id_absence_temporaire AS id,
@@ -155,16 +289,26 @@ export const AttendanceModel = {
           at.heure_sortie_temporaire AS exitTime,
           at.heure_retour_temporaire AS returnTime,
           at.description,
-          TIME_TO_SEC(TIMEDIFF(at.heure_retour_temporaire, at.heure_sortie_temporaire)) / 60 AS duration
+          TIME_TO_SEC(TIMEDIFF(at.heure_retour_temporaire, at.heure_sortie_temporaire)) AS duration_seconds
         FROM absence_temporaire at
         JOIN pointage_journalier pj ON pj.id_pointage = at.id_pointage
         WHERE pj.matricule = ? AND DATE(pj.date) = ?`,
       [matricule, date]
     );
-
-    return rows.map((r: any) => ({
-      ...r,
-      duration: r.duration ? parseFloat((r.duration / 60).toFixed(2)) : 0, // en heures
-    }));
+  
+    return rows.map((r: any) => {
+      let totalSec = r.duration_seconds;
+  
+      // Sécurisation : jamais de secondes négatives
+      if (!totalSec || totalSec < 0) totalSec = 0;
+  
+      const hours = Math.floor(totalSec / 3600);
+      const minutes = Math.floor((totalSec % 3600) / 60);
+  
+      return {
+        ...r,
+        duration: `${hours}h ${minutes}m`,
+      };
+    });
   },
 };

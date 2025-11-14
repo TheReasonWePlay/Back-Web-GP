@@ -14,10 +14,12 @@ export const MobileDashboardModel = {
     const [agents]: any = await db.query(`SELECT COUNT(*) AS total FROM agent`);
     const totalAgents = agents[0].total || 0;
 
+    const now = new Date();
+    const hour1 = now.getHours();
 
     // Récupération de la date du jour
     const [pointages]: any = await db.query(`
-      SELECT pj.*, h.tolerance_retard, h.entree_matin
+      SELECT pj.*, h.tolerance_retard, h.entree_matin, h.entree_aprem
       FROM pointage_journalier pj
       JOIN horaire_travail h ON pj.id_horaire = h.id_horaire
       WHERE DATE(pj.date) = CURDATE()
@@ -28,19 +30,36 @@ export const MobileDashboardModel = {
 
     (pointages as any[]).forEach(pj => {
       // Présent si heure d'arrivée matin existante
-      if (pj.heure_arrive_matin || pj.heure_arrive_aprem) present++;
+      if(hour1 < 12){
+        if (pj.heure_arrive_matin || pj.heure_arrive_aprem) present++;
 
-      // Retard si arrivée après entrée + tolérance
-      if (pj.heure_arrive_matin) {
-        const scheduled = pj.entree_matin; // ex: "08:00:00"
-        const tolerance = pj.tolerance_retard; // minutes
-        const arrive = pj.heure_arrive_matin;
-
-        const scheduledMinutes = Number(scheduled.split(':')[0]) * 60 + Number(scheduled.split(':')[1]);
-        const arriveMinutes = Number(arrive.split(':')[0]) * 60 + Number(arrive.split(':')[1]);
-
-        if (arriveMinutes > scheduledMinutes + tolerance) late++;
+        // Retard si arrivée après entrée + tolérance
+        if (pj.heure_arrive_matin) {
+          const scheduled = pj.entree_matin; // ex: "08:00:00"
+          const tolerance = pj.tolerance_retard; // minutes
+          const arrive = pj.heure_arrive_matin;
+  
+          const scheduledMinutes = Number(scheduled.split(':')[0]) * 60 + Number(scheduled.split(':')[1]);
+          const arriveMinutes = Number(arrive.split(':')[0]) * 60 + Number(arrive.split(':')[1]);
+  
+          if (arriveMinutes > scheduledMinutes + tolerance) late++;
+        }
       }
+      else{
+        if (pj.heure_arrive_aprem) present++;
+
+        if (pj.heure_arrive_aprem) {
+          const scheduled = pj.entree_aprem; // ex: "08:00:00"
+          const tolerance = pj.tolerance_retard; // minutes
+          const arrive = pj.heure_arrive_aprem;
+  
+          const scheduledMinutes = Number(scheduled.split(':')[0]) * 60 + Number(scheduled.split(':')[1]);
+          const arriveMinutes = Number(arrive.split(':')[0]) * 60 + Number(arrive.split(':')[1]);
+  
+          if (arriveMinutes > scheduledMinutes + tolerance) late++;
+        }
+      }
+     
     });
 
     const percent = totalAgents > 0 ? Math.round((present / totalAgents) * 100) : 0;
