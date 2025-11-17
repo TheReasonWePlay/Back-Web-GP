@@ -61,16 +61,18 @@ export const WorkScheduleModel = {
   async findById(id: string): Promise<WorkSchedule | null> {
     const [rows]: any = await db.query(`
       SELECT 
-        id_horaire AS id,
-        intitule AS name,
-        entree_matin AS morningStart,
-        sortie_matin AS morningEnd,
-        entree_aprem AS afternoonStart,
-        sortie_aprem AS afternoonEnd,
-        tolerance_retard AS tolerance,
-        actif AS isActive
-      FROM horaire_travail
-      WHERE id_horaire = ?
+      h.id_horaire AS id,
+      h.intitule AS name,
+      h.entree_matin AS morningStart,
+      h.sortie_matin AS morningEnd,
+      h.entree_aprem AS afternoonStart,
+      h.sortie_aprem AS afternoonEnd,
+      h.tolerance_retard AS tolerance,
+      h.actif AS isActive,
+      CASE WHEN COUNT(p.id_horaire) = 0 THEN TRUE ELSE FALSE END AS deletable
+    FROM horaire_travail h
+    LEFT JOIN pointage_journalier p ON p.id_horaire = h.id_horaire
+      WHERE p.id_horaire = ?
     `, [id]);
     return rows[0] || null;
   },

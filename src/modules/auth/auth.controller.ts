@@ -10,7 +10,7 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
 
     const result = await AuthService.login(username, password);
     if (!result) {
-      return res.status(401).json({ success: false, error: 'Invalid username or password' });
+      return res.status(401).json({ success: false, error: 'Mot de Passe ou Utilisateur Invalide' });
     }
 
     return res.json({ success: true, data: result, message: 'Login successful' });

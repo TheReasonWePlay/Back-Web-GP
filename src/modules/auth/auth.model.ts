@@ -12,7 +12,7 @@ export type UserRow = {
 // recherche par nom_utilisateur ou email
 export const findByUsernameOrEmail = async (usernameOrEmail: string): Promise<UserRow | null> => {
   const [rows] = await pool.query(
-    'SELECT id, email, nom_utilisateur, mot_de_passe, role, matricule FROM login WHERE nom_utilisateur = ? OR email = ? LIMIT 1',
+    'SELECT id, email, nom_utilisateur, mot_de_passe, role FROM login WHERE nom_utilisateur = ? OR email = ? LIMIT 1',
     [usernameOrEmail, usernameOrEmail]
   );
   const result = (rows as UserRow[])[0];
