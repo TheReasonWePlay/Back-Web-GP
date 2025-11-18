@@ -60,6 +60,7 @@ export const AttendanceModel = {
             ON a.matricule = p.matricule AND DATE(p.date) = ?
         LEFT JOIN horaire_travail h 
             ON p.id_horaire = h.id_horaire
+        ORDER BY a.division ASC, a.nom ASC;
       `,
       [date]
     );
@@ -80,6 +81,32 @@ export const AttendanceModel = {
         WHERE DATE(pj.date) = ?
       `,
       [date]
+    );
+
+    const [heureHoraire]: any = await db.query(
+      `
+        SELECT 
+        h.entree_matin,
+        h.sortie_matin,
+        h.entree_aprem,
+        h.sortie_aprem
+        FROM horaire_travail h 
+        JOIN pointage_journalier pj ON pj.id_horaire = h.id_horaire
+        WHERE DATE(pj.date) = ?
+      `,
+      [date]
+    );
+
+    const [heureHoraire1]: any = await db.query(
+      `
+        SELECT 
+        entree_matin,
+        sortie_matin,
+        entree_aprem,
+        sortie_aprem
+        FROM horaire_travail 
+        WHERE actif = 1
+      `
     );
   
     // Réorganisation par id_pointage
@@ -120,34 +147,62 @@ export const AttendanceModel = {
     //
     for (const a of agents) {
       const isPresent = !!a.id_pointage;
-  
+    
       if (isPresent) present++;
       else absent++;
-  
+    
       // Vérification retard
       let isLate = false;
       if (a.checkInAM && a.expectedAM) {
         const tolerance = a.lateTolerance ? Number(a.lateTolerance) : 0;
         const expected = timeToSec(a.expectedAM) + tolerance * 60;
         const actual = timeToSec(a.checkInAM);
-  
+    
         if (actual > expected) {
           late++;
           isLate = true;
         }
       }
-  
-      // Calcul des heures travaillées
-      const morning =
-        Math.max(0, timeToSec(a.checkOutAM) - timeToSec(a.checkInAM));
-  
-      const afternoon =
-        Math.max(0, timeToSec(a.checkOutPM) - timeToSec(a.checkInPM));
-  
-      const totalSeconds = morning + afternoon;
-  
+    
+      // --- Calcul de la durée théorique (horaire total) ---
+      // Attention : tu dois récupérer ces valeurs horaires (entrées et sorties matin/aprem) pour calculer la durée théorique totale
+      // Ici on suppose que a.entree_matin, a.sortie_matin, a.entree_aprem, a.sortie_aprem existent (ou récupérées via la jointure horaire_travail)
+      // Sinon adapte en fonction de tes données
+    
+      const defaultTime = "00:00:00";
+      const horaire = heureHoraire[0] || heureHoraire1[0];
+
+      const startMorning = timeToSec(horaire.entree_matin || defaultTime);
+      const endMorning = timeToSec(horaire.sortie_matin || defaultTime);
+      const startAfternoon = timeToSec(horaire.entree_aprem || defaultTime);
+      const endAfternoon = timeToSec(horaire.sortie_aprem || defaultTime);
+
+    
+      const scheduledSeconds = Math.max(0, endMorning - startMorning) + Math.max(0, endAfternoon - startAfternoon);
+    
+      // Durée travaillée (calcul déjà fait)
+      const morning = Math.max(0, timeToSec(a.checkOutAM) - timeToSec(a.checkInAM));
+      const afternoon = Math.max(0, timeToSec(a.checkOutPM) - timeToSec(a.checkInPM));
+      const workedSeconds = morning + afternoon;
+    
+      // Durée des sorties temporaires
+      let totalExitSeconds = 0;
       const agentExits = exitsByPointage[a.id_pointage] || [];
-  
+      for (const exit of agentExits) {
+        if (exit.exitTime && exit.returnTime) {
+          const exitSec = timeToSec(exit.returnTime) - timeToSec(exit.exitTime);
+          if (exitSec > 0) totalExitSeconds += exitSec;
+        }
+      }
+    
+      // Calcul heure manquée
+      let missedSeconds = scheduledSeconds - workedSeconds + totalExitSeconds;
+      console.log(scheduledSeconds);
+      console.log(workedSeconds);
+      console.log(totalExitSeconds);
+      console.log(missedSeconds);
+      if (missedSeconds < 0) missedSeconds = 0; // ne pas avoir de négatif
+    
       pointageRecords.push({
         id: a.id_pointage || "",
         agentId: a.agentId,
@@ -158,10 +213,11 @@ export const AttendanceModel = {
         checkInPM: a.checkInPM || "",
         checkOutPM: a.checkOutPM || "",
         status: isPresent ? (isLate ? "late" : "present") : "absent",
-        totalMissedTime: formatHM(totalSeconds),
+        totalMissedTime: formatHM(missedSeconds),
         temporaryExits: agentExits,
       });
     }
+    
   
     //
     // 6️⃣ Finaliser les ratios
