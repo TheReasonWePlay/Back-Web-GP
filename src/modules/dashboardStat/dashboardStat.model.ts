@@ -117,7 +117,7 @@ export const DashboardStatModel = {
       SELECT 
         a.nom AS agentName,
         'check-in' AS type,
-        CONCAT('Checked in at ', p.heure_arrive_matin) AS description,
+        CONCAT('Arrivé a ', p.heure_arrive_matin) AS description,
         CONCAT(DATE(p.date), ' ', p.heure_arrive_matin) AS timestamp
       FROM pointage_journalier p
       JOIN agent a ON a.matricule = p.matricule
@@ -128,7 +128,7 @@ export const DashboardStatModel = {
       SELECT 
         a.nom AS agentName,
         'check-out' AS type,
-        CONCAT('Checked out at ', p.heure_sortie_aprem) AS description,
+        CONCAT('Rentré a ', p.heure_sortie_aprem) AS description,
         CONCAT(DATE(p.date), ' ', p.heure_sortie_aprem) AS timestamp
       FROM pointage_journalier p
       JOIN agent a ON a.matricule = p.matricule
@@ -139,7 +139,7 @@ export const DashboardStatModel = {
       SELECT 
         a.nom AS agentName,
         'leave-request' AS type,
-        CONCAT('On leave: ', al.motif) AS description,
+        CONCAT('Sortie a : ', al.motif) AS description,
         al.date_debut AS timestamp
       FROM absence_longue al
       JOIN agent a ON a.matricule = al.matricule
