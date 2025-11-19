@@ -11,6 +11,7 @@ import calendarHolidayRoutes from './modules/calendarHoliday/calendarHoliday.rou
 import userRoutes from './modules/user/user.routes';
 import dashboardStatRoutes from './modules/dashboardStat/dashboardStat.routes';
 import mobileRoutes from './modules/mobile/mobile.routes';
+import reportRoutes from './modules/report/report.routes';
 dotenv.config();
 
 const app = express();
@@ -27,6 +28,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/attendance', agentAttendanceRoutes);
 app.use('/api/dashboard', dashboardStatRoutes);
 app.use('/api/mobile', mobileRoutes);
+app.use("/api/report", reportRoutes);
 
 
 // health check
